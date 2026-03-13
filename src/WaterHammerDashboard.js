@@ -45,34 +45,63 @@ const SectionLabel = ({ icon: Icon, children }) => (
 const CustomTooltip = ({ active, payload, label, metric }) => {
   if (!active || !payload || !payload.length) return null;
   const unit = metric === 'DISCHARGE' ? 'CFS' : 'FEET';
+
+  /* split nodes into 2 columns */
+  const half = Math.ceil(payload.length / 2);
+  const col1 = payload.slice(0, half);
+  const col2 = payload.slice(half);
+
+  const NodeRow = ({ entry }) => (
+    <div style={{
+      display: 'flex', alignItems: 'center',
+      justifyContent: 'space-between', gap: '8px', padding: '1px 0'
+    }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+        <span style={{
+          width: '8px', height: '8px', borderRadius: '50%',
+          background: entry.color, flexShrink: 0,
+          boxShadow: `0 0 4px ${entry.color}`
+        }} />
+        <span style={{ color: '#94A3B8', fontSize: '0.73rem', fontWeight: 500, whiteSpace: 'nowrap' }}>
+          {entry.dataKey}
+        </span>
+      </span>
+      <span style={{
+        color: '#F1F5F9', fontSize: '0.76rem', fontWeight: 700,
+        fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', flexShrink: 0
+      }}>
+        {entry.value != null ? `${Number(entry.value).toFixed(2)} ${unit}` : '—'}
+      </span>
+    </div>
+  );
+
   return (
     <div style={{
       background: '#1E293B', borderRadius: '10px',
-      padding: '12px 16px', boxShadow: '0 8px 24px rgba(0,0,0,.3)',
-      minWidth: '190px', pointerEvents: 'none'
+      padding: '10px 14px 12px',
+      boxShadow: '0 8px 28px rgba(0,0,0,.5)',
+      pointerEvents: 'none',
+      border: '1px solid #334155',
+      minWidth: '360px',
+      maxWidth: '440px',
     }}>
-      <div style={{ color: '#94A3B8', fontSize: '0.75rem', marginBottom: '8px', fontWeight: 600 }}>
+      {/* header */}
+      <div style={{
+        color: '#CBD5E1', fontSize: '0.78rem', fontWeight: 700,
+        marginBottom: '8px', borderBottom: '1px solid #334155',
+        paddingBottom: '6px', textAlign: 'center', letterSpacing: '.06em'
+      }}>
         Time: {Number(label).toFixed(2)} s
       </div>
-      {payload.map((entry) => (
-        <div key={entry.dataKey} style={{
-          display: 'flex', justifyContent: 'space-between',
-          gap: '14px', marginBottom: '3px', alignItems: 'center'
-        }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <span style={{
-              width: '8px', height: '8px', borderRadius: '50%',
-              background: entry.color, flexShrink: 0
-            }} />
-            <span style={{ color: '#CBD5E1', fontSize: '0.78rem', fontWeight: 500 }}>
-              {entry.dataKey}
-            </span>
-          </span>
-          <span style={{ color: '#F8FAFC', fontSize: '0.82rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-            {entry.value != null ? Number(entry.value).toFixed(2) : '—'} {unit}
-          </span>
+      {/* 2-column grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 18px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          {col1.map(e => <NodeRow key={e.dataKey} entry={e} />)}
         </div>
-      ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          {col2.map(e => <NodeRow key={e.dataKey} entry={e} />)}
+        </div>
+      </div>
     </div>
   );
 };
@@ -832,7 +861,11 @@ const WaterHammerDashboard = () => {
                       />
                       <Tooltip
                         content={<CustomTooltip metric={selectedMetric} />}
-                        cursor={{ stroke: '#6366F1', strokeWidth: 1.5, strokeDasharray: '4 3' }}
+                        cursor={{ stroke: '#6366F1', strokeWidth: 1, strokeDasharray: '5 4', opacity: 0.7 }}
+                        position={{ y: 0 }}
+                        offset={18}
+                        allowEscapeViewBox={{ x: false, y: true }}
+                        wrapperStyle={{ zIndex: 30, top: 0 }}
                       />
                       <Legend
                         wrapperStyle={{
@@ -862,8 +895,8 @@ const WaterHammerDashboard = () => {
                           dataKey={node}
                           stroke={nodeColor(node)}
                           strokeWidth={2}
-                          dot={chartData.length <= 400 ? { r: 2.5, fill: nodeColor(node), strokeWidth: 0 } : false}
-                          activeDot={{ r: 5, strokeWidth: 0 }}
+                          dot={chartData.length <= 400 ? { r: 2, fill: nodeColor(node), strokeWidth: 0, opacity: 0.7 } : false}
+                          activeDot={{ r: 6, fill: nodeColor(node), stroke: '#fff', strokeWidth: 2 }}
                           isAnimationActive={false}
                         />
                       ))}
