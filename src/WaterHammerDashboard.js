@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ReferenceLine, ResponsiveContainer
+  Tooltip, Legend, ReferenceLine
 } from 'recharts';
 import {
   Download, Upload, CheckCircle, AlertCircle, Activity,
@@ -101,7 +101,10 @@ const WaterHammerDashboard = () => {
   const [isSimulating,  setIsSimulating]  = useState(false);
   const [simIndex,      setSimIndex]      = useState(0);
   const [simSpeed,      setSimSpeed]      = useState(80);   /* ms per frame */
-  const simRef = useRef(null);
+  const simRef         = useRef(null);
+  const lastFrameTime  = useRef(0);
+  const simSpeedRef    = useRef(simSpeed);
+  useEffect(() => { simSpeedRef.current = simSpeed; }, [simSpeed]);
 
   const fileInputRef       = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -222,37 +225,46 @@ const WaterHammerDashboard = () => {
 
   /* values at simulation cursor */
   const simValues = useMemo(() => {
-    if (!isSimulating && simIndex === 0) return null;
+    if (simIndex === 0 && !isSimulating) return null;
     const row = chartData[simIndex];
     if (!row) return null;
     return row;
   }, [simIndex, chartData, isSimulating]);
 
-  /* ════════════════ SIMULATION ════════════════════════════════ */
+  /* ════════════════ SIMULATION (requestAnimationFrame) ════════ */
   const stopSimulation = useCallback(() => {
-    if (simRef.current) clearInterval(simRef.current);
+    if (simRef.current) cancelAnimationFrame(simRef.current);
     simRef.current = null;
     setIsSimulating(false);
   }, []);
 
   const startSimulation = useCallback(() => {
     if (!chartData.length) return;
+    lastFrameTime.current = 0;
     setIsSimulating(true);
-    simRef.current = setInterval(() => {
-      setSimIndex(prev => {
-        if (prev >= chartData.length - 1) {
-          clearInterval(simRef.current);
-          simRef.current = null;
-          setIsSimulating(false);
-          return prev;
-        }
-        return prev + 1;
-      });
-    }, simSpeed);
-  }, [chartData.length, simSpeed]);
+
+    const animate = (timestamp) => {
+      if (!lastFrameTime.current) lastFrameTime.current = timestamp;
+      const elapsed = timestamp - lastFrameTime.current;
+
+      if (elapsed >= simSpeedRef.current) {
+        lastFrameTime.current = timestamp - (elapsed % simSpeedRef.current);
+        setSimIndex(prev => {
+          if (prev >= chartData.length - 1) {
+            setIsSimulating(false);
+            return prev;
+          }
+          return prev + 1;
+        });
+      }
+      simRef.current = requestAnimationFrame(animate);
+    };
+
+    simRef.current = requestAnimationFrame(animate);
+  }, [chartData.length]);
 
   const pauseSimulation = useCallback(() => {
-    if (simRef.current) clearInterval(simRef.current);
+    if (simRef.current) cancelAnimationFrame(simRef.current);
     simRef.current = null;
     setIsSimulating(false);
   }, []);
@@ -262,17 +274,10 @@ const WaterHammerDashboard = () => {
     setSimIndex(0);
   }, [stopSimulation]);
 
-  /* restart when speed changes while playing */
-  useEffect(() => {
-    if (isSimulating) {
-      pauseSimulation();
-      startSimulation();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simSpeed]);
+  /* no restart-on-speed-change needed — RAF reads simSpeedRef live */
 
   /* cleanup on unmount */
-  useEffect(() => () => { if (simRef.current) clearInterval(simRef.current); }, []);
+  useEffect(() => () => { if (simRef.current) cancelAnimationFrame(simRef.current); }, []);
 
   /* auto-scroll chart to keep reference line in view during simulation */
   useEffect(() => {
@@ -679,12 +684,13 @@ const WaterHammerDashboard = () => {
                       onChange={(e) => setSimSpeed(Number(e.target.value))}
                       style={{ ...selectStyle, padding: '4px 8px', fontSize: '0.78rem', width: 'auto' }}
                     >
+                      <option value={400}>0.25×</option>
                       <option value={200}>0.5×</option>
                       <option value={100}>1×</option>
-                      <option value={60}>1.5×</option>
-                      <option value={40}>2×</option>
-                      <option value={20}>4×</option>
-                      <option value={8}>10×</option>
+                      <option value={50}>2×</option>
+                      <option value={20}>5×</option>
+                      <option value={8}>12×</option>
+                      <option value={3}>30×</option>
                     </select>
                   </div>
                 </div>
@@ -709,64 +715,68 @@ const WaterHammerDashboard = () => {
                     const maxT  = chartData[chartData.length - 1]?.time ?? 1;
                     const xAbs  = MARGIN_LEFT + ((simTime - minT) / (maxT - minT)) * plotW;
 
-                    const PANEL_W = 320;
+                    const PANEL_W = 400;
                     /* flip panel to left side of line when near right edge of content */
-                    const left = xAbs + PANEL_W + 10 > chartPxWidth
-                      ? xAbs - PANEL_W - 10
-                      : xAbs + 10;
+                    const left = xAbs + PANEL_W + 12 > chartPxWidth
+                      ? xAbs - PANEL_W - 12
+                      : xAbs + 12;
 
-                    const nodes    = selectedNodes;
-                    const half     = Math.ceil(nodes.length / 2);
-                    const col1     = nodes.slice(0, half);
-                    const col2     = nodes.slice(half);
+                    const nodes = selectedNodes;
+                    const half  = Math.ceil(nodes.length / 2);
+                    const col1  = nodes.slice(0, half);
+                    const col2  = nodes.slice(half);
 
                     return (
                       <div style={{
                         position: 'absolute',
-                        top: '10px',
+                        top: '8px',
                         left: `${Math.max(4, left)}px`,
                         width: `${PANEL_W}px`,
                         background: '#1E293B',
                         borderRadius: '10px',
-                        padding: '10px 12px',
-                        boxShadow: '0 8px 28px rgba(0,0,0,.4)',
+                        padding: '10px 14px 12px',
+                        boxShadow: '0 8px 28px rgba(0,0,0,.45)',
                         zIndex: 20,
                         pointerEvents: 'none',
+                        maxHeight: '360px',
+                        overflow: 'hidden',
                       }}>
                         {/* time header */}
                         <div style={{
-                          color: '#94A3B8', fontSize: '0.75rem', fontWeight: 700,
+                          color: '#CBD5E1', fontSize: '0.78rem', fontWeight: 700,
                           marginBottom: '8px', borderBottom: '1px solid #334155',
-                          paddingBottom: '6px', textAlign: 'center', letterSpacing: '.04em'
+                          paddingBottom: '6px', textAlign: 'center', letterSpacing: '.06em'
                         }}>
                           Time: {simTime.toFixed(2)} s
                         </div>
-                        {/* 2-column grid */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 10px' }}>
+                        {/* 2-column grid — each column is a node list */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 16px' }}>
                           {[col1, col2].map((col, ci) => (
                             <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                               {col.map(node => (
                                 <div key={node} style={{
                                   display: 'flex', alignItems: 'center',
-                                  justifyContent: 'space-between', gap: '6px'
+                                  justifyContent: 'space-between', gap: '6px',
+                                  padding: '1px 0'
                                 }}>
-                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+                                  {/* dot + name */}
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
                                     <span style={{
-                                      width: '7px', height: '7px', borderRadius: '50%',
+                                      width: '8px', height: '8px', borderRadius: '50%',
                                       background: nodeColor(node), flexShrink: 0
                                     }} />
                                     <span style={{
-                                      color: '#94A3B8', fontSize: '0.72rem',
-                                      fontWeight: 500, overflow: 'hidden',
-                                      textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                                      color: '#94A3B8', fontSize: '0.73rem',
+                                      fontWeight: 500, whiteSpace: 'nowrap'
                                     }}>
                                       {node}
                                     </span>
                                   </span>
+                                  {/* value */}
                                   <span style={{
-                                    color: '#F1F5F9', fontSize: '0.75rem',
+                                    color: '#F1F5F9', fontSize: '0.76rem',
                                     fontWeight: 700, fontVariantNumeric: 'tabular-nums',
-                                    whiteSpace: 'nowrap'
+                                    whiteSpace: 'nowrap', flexShrink: 0
                                   }}>
                                     {simValues[node] != null
                                       ? `${simValues[node].toFixed(2)} ${metricUnit}`
@@ -788,7 +798,14 @@ const WaterHammerDashboard = () => {
                       data={chartData}
                       margin={{ top: 8, right: 24, left: 10, bottom: 30 }}
                     >
-                      <CartesianGrid strokeDasharray="4 4" stroke="#F3F4F6" vertical={false} />
+                      <CartesianGrid
+                        strokeDasharray="0"
+                        stroke="#374151"
+                        strokeWidth={0.6}
+                        horizontal={true}
+                        vertical={true}
+                        opacity={0.35}
+                      />
                       <XAxis
                         dataKey="time"
                         stroke="#D1D5DB"
@@ -845,9 +862,9 @@ const WaterHammerDashboard = () => {
                           dataKey={node}
                           stroke={nodeColor(node)}
                           strokeWidth={2}
-                          dot={false}
-                          isAnimationActive={false}
+                          dot={chartData.length <= 400 ? { r: 2.5, fill: nodeColor(node), strokeWidth: 0 } : false}
                           activeDot={{ r: 5, strokeWidth: 0 }}
+                          isAnimationActive={false}
                         />
                       ))}
                     </LineChart>
