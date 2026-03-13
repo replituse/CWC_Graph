@@ -103,7 +103,9 @@ const WaterHammerDashboard = () => {
   const [simSpeed,      setSimSpeed]      = useState(80);   /* ms per frame */
   const simRef = useRef(null);
 
-  const fileInputRef = useRef(null);
+  const fileInputRef       = useRef(null);
+  const scrollContainerRef = useRef(null);
+  const scrollLeftRef      = useRef(0);
 
   /* ════════════════ TAB PARSER (from provided script) ══════════ */
   const parseTabFile = (content) => {
@@ -271,6 +273,24 @@ const WaterHammerDashboard = () => {
 
   /* cleanup on unmount */
   useEffect(() => () => { if (simRef.current) clearInterval(simRef.current); }, []);
+
+  /* auto-scroll chart to keep reference line in view during simulation */
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || simTime == null || !chartData.length) return;
+    const MARGIN_LEFT = 10 + 72;
+    const MARGIN_RIGHT = 24;
+    const plotW = chartPxWidth - MARGIN_LEFT - MARGIN_RIGHT;
+    const minT  = chartData[0]?.time ?? 0;
+    const maxT  = chartData[chartData.length - 1]?.time ?? 1;
+    const xAbs  = MARGIN_LEFT + ((simTime - minT) / (maxT - minT)) * plotW;
+    const containerW = container.clientWidth;
+    const margin = 120;
+    if (xAbs < container.scrollLeft + margin || xAbs > container.scrollLeft + containerW - margin) {
+      container.scrollLeft = xAbs - containerW / 2;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simIndex]);
 
   /* ════════════════ CSV EXPORT ════════════════════════════════ */
   const exportToCSV = () => {
@@ -669,37 +689,98 @@ const WaterHammerDashboard = () => {
                   </div>
                 </div>
 
-                {/* live node values strip while simulating */}
-                {simValues && (
-                  <div style={{
-                    display: 'flex', flexWrap: 'wrap', gap: '6px',
-                    marginBottom: '12px', padding: '10px 12px',
-                    background: '#1E293B', borderRadius: '8px'
-                  }}>
-                    {selectedNodes.map(node => (
-                      <span key={node} style={{
-                        display: 'inline-flex', alignItems: 'center', gap: '5px',
-                        padding: '3px 10px', borderRadius: '999px',
-                        background: `${nodeColor(node)}22`,
-                        border: `1px solid ${nodeColor(node)}55`,
-                        fontSize: '0.75rem', color: '#F1F5F9', fontWeight: 600,
-                        fontVariantNumeric: 'tabular-nums'
-                      }}>
-                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: nodeColor(node) }} />
-                        {node}: {simValues[node] != null ? simValues[node].toFixed(2) : '—'} {metricUnit}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
                 {/* ── Scrollable chart container ─────────────── */}
-                <div style={{
-                  overflowX: 'auto', overflowY: 'hidden',
-                  borderRadius: '8px',
-                  /* custom scrollbar */
-                  scrollbarWidth: 'thin',
-                  scrollbarColor: '#C7D2FE #F3F4F6',
-                }}>
+                <div
+                  ref={scrollContainerRef}
+                  onScroll={(e) => { scrollLeftRef.current = e.target.scrollLeft; }}
+                  style={{
+                    overflowX: 'auto', overflowY: 'hidden',
+                    borderRadius: '8px', position: 'relative',
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: '#C7D2FE #F3F4F6',
+                  }}
+                >
+                  {/* ── Vertical 2-column simulation panel ────── */}
+                  {simValues && simTime != null && (() => {
+                    const MARGIN_LEFT  = 10 + 72;
+                    const MARGIN_RIGHT = 24;
+                    const plotW = chartPxWidth - MARGIN_LEFT - MARGIN_RIGHT;
+                    const minT  = chartData[0]?.time ?? 0;
+                    const maxT  = chartData[chartData.length - 1]?.time ?? 1;
+                    const xAbs  = MARGIN_LEFT + ((simTime - minT) / (maxT - minT)) * plotW;
+
+                    const PANEL_W = 320;
+                    /* flip panel to left side of line when near right edge of content */
+                    const left = xAbs + PANEL_W + 10 > chartPxWidth
+                      ? xAbs - PANEL_W - 10
+                      : xAbs + 10;
+
+                    const nodes    = selectedNodes;
+                    const half     = Math.ceil(nodes.length / 2);
+                    const col1     = nodes.slice(0, half);
+                    const col2     = nodes.slice(half);
+
+                    return (
+                      <div style={{
+                        position: 'absolute',
+                        top: '10px',
+                        left: `${Math.max(4, left)}px`,
+                        width: `${PANEL_W}px`,
+                        background: '#1E293B',
+                        borderRadius: '10px',
+                        padding: '10px 12px',
+                        boxShadow: '0 8px 28px rgba(0,0,0,.4)',
+                        zIndex: 20,
+                        pointerEvents: 'none',
+                      }}>
+                        {/* time header */}
+                        <div style={{
+                          color: '#94A3B8', fontSize: '0.75rem', fontWeight: 700,
+                          marginBottom: '8px', borderBottom: '1px solid #334155',
+                          paddingBottom: '6px', textAlign: 'center', letterSpacing: '.04em'
+                        }}>
+                          Time: {simTime.toFixed(2)} s
+                        </div>
+                        {/* 2-column grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 10px' }}>
+                          {[col1, col2].map((col, ci) => (
+                            <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              {col.map(node => (
+                                <div key={node} style={{
+                                  display: 'flex', alignItems: 'center',
+                                  justifyContent: 'space-between', gap: '6px'
+                                }}>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+                                    <span style={{
+                                      width: '7px', height: '7px', borderRadius: '50%',
+                                      background: nodeColor(node), flexShrink: 0
+                                    }} />
+                                    <span style={{
+                                      color: '#94A3B8', fontSize: '0.72rem',
+                                      fontWeight: 500, overflow: 'hidden',
+                                      textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                                    }}>
+                                      {node}
+                                    </span>
+                                  </span>
+                                  <span style={{
+                                    color: '#F1F5F9', fontSize: '0.75rem',
+                                    fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+                                    whiteSpace: 'nowrap'
+                                  }}>
+                                    {simValues[node] != null
+                                      ? `${simValues[node].toFixed(2)} ${metricUnit}`
+                                      : '—'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <div style={{ width: `${chartPxWidth}px`, paddingBottom: '4px' }}>
                     <LineChart
                       width={chartPxWidth}
