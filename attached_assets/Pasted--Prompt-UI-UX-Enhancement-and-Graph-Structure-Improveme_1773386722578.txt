@@ -1,0 +1,242 @@
+**Prompt: UI/UX Enhancement and Graph Structure Improvement (Without Changing Existing Logic)**
+
+You are a senior React.js UI/UX engineer. Improve the visual design, layout structure, and usability of the existing Water Hammer Analysis Dashboard without modifying any backend logic, data processing, simulation logic, or existing functional behavior.
+
+### Key Requirements
+
+**Important Rule:**
+Do **NOT** change any core logic, data parsing, API calls, calculations, or existing functionality. Only improve **UI, layout, styling, alignment, and graph readability**.
+
+---
+
+## 1. Professional UI Design Improvement
+
+Redesign the dashboard interface to look modern, professional, and clean.
+
+UI improvements should include:
+
+* Use a **structured dashboard layout**
+* Add **card-based sections**
+* Improve **spacing, padding, and typography**
+* Use a **consistent color palette**
+* Improve **visual hierarchy**
+
+Suggested layout:
+
+Header Section
+
+* Title: *Water Hammer Analysis Dashboard*
+* Subtitle: *Real-time Visualization & Analysis of WHAMO Simulation Data*
+
+Control Panel Card
+
+* Metric dropdown
+* Time Step slider
+* Load File button
+* Loaded points indicator
+
+Filter Panel Card
+
+* Time Range slider
+* Node selection panel
+
+Graph Panel Card
+
+* Main interactive graph
+
+Export Section
+
+* Export CSV button
+
+Use:
+
+* **Flexbox/Grid layout**
+* **consistent margins**
+* **responsive design**
+
+---
+
+## 2. Graph Structure & Data Visualization Improvements
+
+Improve the graph readability and structure while keeping the existing data source.
+
+Enhancements:
+
+* Display **node values clearly**
+* Ensure the **graph values match the TAB file values exactly**
+* Improve **axis labeling**
+
+Graph requirements:
+
+X-Axis
+
+* Time (seconds)
+
+Y-Axis
+
+* Selected Metric (CFS, Pressure, etc.)
+
+Enhancements:
+
+* Smooth lines
+* Clear legend
+* Better tooltip
+
+Tooltip must show:
+Node Name
+Time
+Exact Value
+
+Example:
+
+Node: NODE_NO_1
+Time: 560.85 s
+Discharge: 4120 CFS
+
+Legend improvements:
+
+* Scrollable legend if many nodes
+* Color-coded nodes
+* Toggle visibility
+
+---
+
+## 3. Smooth Graph Scrolling
+
+When the page scrolls:
+
+* Graph should **scroll smoothly**
+* Avoid graph overflow issues
+* Maintain **fixed control panel**
+* Graph should be inside a **responsive container**
+
+Implement:
+
+overflow-x: auto
+overflow-y: hidden
+
+Graph container should support horizontal scrolling when multiple nodes are selected.
+
+---
+
+## 4. Proper Alignment of Controls
+
+Align all dashboard controls in a clean row layout.
+
+Items that must align properly:
+
+* Metric selector
+* Time Step slider
+* Loaded points indicator
+* Load New File button
+* Time Range slider
+
+Use a **grid layout** like:
+
+Row 1
+Metric | Time Step | Loaded Points | Load File
+
+Row 2
+Time Range Slider
+
+Ensure:
+
+* consistent spacing
+* responsive resizing
+* proper label alignment
+
+---
+
+## 5. Node Selection UI Improvement
+
+Improve the **node selection interface**.
+
+Requirements:
+
+* Display nodes as **selectable chips or buttons**
+* Color indicator for each node
+* Active nodes highlighted
+* Better spacing
+
+Example layout:
+
+NODE_NO_1   NODE_NO_2   NODE_NO_3
+NODE_NO_6   NODE_NO_8   NODE_NO_21
+
+Enhancements:
+
+* Scrollable node container
+* Select/Deselect animation
+* Node color should match graph line color
+
+---
+
+## 6. Improve Data Status Indicators
+
+Improve the **Loaded Data indicator**.
+
+Example:
+
+✔ Loaded 2171 data points
+✔ 38 metrics available
+
+Use a **success status badge or alert box**.
+
+---
+
+## 7. Clean Graph Container
+
+Improve graph container styling:
+
+* Card style
+* Shadow
+* Rounded corners
+* Padding
+
+Example:
+
+Graph Card
+Title: ⚡ Discharge Flow (CFS)
+
+---
+
+## 8. Maintain Existing Functionality
+
+Do NOT modify:
+
+* Data parsing from TAB file
+* Node calculation logic
+* Time step logic
+* Metric selection logic
+* CSV export functionality
+
+Only update:
+
+* UI components
+* CSS / Tailwind styling
+* layout structure
+* chart configuration
+
+---
+
+## 9. Recommended Tech
+
+If needed, improve UI using:
+
+* TailwindCSS
+* Recharts styling improvements
+* React functional components
+* CSS Grid / Flexbox
+
+---
+
+## Expected Result
+
+The dashboard should:
+
+* Look **modern and professional**
+* Have **clean alignment**
+* Show **clear graph values**
+* Have **smooth scrolling**
+* Display **nodes clearly**
+* Maintain **all existing functionality**
