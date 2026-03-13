@@ -1,0 +1,379 @@
+import React, { useState, useMemo, useRef } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { Download, Upload } from "lucide-react";
+
+const WaterHammerDashboard = () => {
+  const [rawData, setRawData] = useState([]);
+  const [selectedNodes, setSelectedNodes] = useState([]);
+  const [selectedMetric, setSelectedMetric] = useState("DISCHARGE");
+  const [selectedTime, setSelectedTime] = useState(null);
+  const [exportMode, setExportMode] = useState("selected");
+  const [singleExportNode, setSingleExportNode] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
+  const fileInputRef = useRef(null);
+
+  /* ================= TAB PARSER ================= */
+  const parseTabFile = (content) => {
+    const lines = content.split(/\r?\n/);
+    const timeMap = {};
+
+    let startIndex = lines.findIndex(
+      (line) => line.includes("(SEC.)") && line.includes("(CFS)")
+    );
+
+    if (startIndex === -1) return [];
+    startIndex += 2;
+
+    for (let i = startIndex; i < lines.length; i++) {
+      const parts = lines[i].trim().split(/\s+/);
+      if (parts.length < 3) continue;
+
+      const timeVal = parseFloat(parts[0]);
+      if (isNaN(timeVal)) continue;
+
+      if (!timeMap[timeVal]) {
+        timeMap[timeVal] = { time: timeVal };
+      }
+
+      let nodeCounter = 1;
+      for (let j = 1; j < parts.length - 1; j += 2) {
+        const discharge = parseFloat(parts[j]);
+        const elevation = parseFloat(parts[j + 1]);
+        if (!isNaN(discharge) && !isNaN(elevation)) {
+          timeMap[timeVal][`NODE_NO_${nodeCounter}_DISCHARGE`] = discharge;
+          timeMap[timeVal][`NODE_NO_${nodeCounter}_ENERGY_ELEV`] = elevation;
+          nodeCounter++;
+        }
+      }
+    }
+
+    return Object.values(timeMap).sort((a, b) => a.time - b.time);
+  };
+
+  /* ================= FILE UPLOAD ================= */
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const parsed = parseTabFile(event.target.result);
+      if (!parsed.length) {
+        setStatusMessage("❌ No data found");
+        return;
+      }
+
+      setRawData(parsed);
+      const nodes = Object.keys(parsed[0])
+        .filter((k) => k.includes("_DISCHARGE"))
+        .map((k) => k.replace("_DISCHARGE", ""));
+
+      setSelectedNodes(nodes);
+      setStatusMessage(
+        `✓ Loaded ${parsed.length} time steps | ${nodes.length} nodes`
+      );
+    };
+
+    reader.readAsText(file);
+  };
+
+  const availableNodes = useMemo(() => {
+    if (!rawData.length) return [];
+    return Object.keys(rawData[0])
+      .filter((k) => k.includes("_DISCHARGE"))
+      .map((k) => k.replace("_DISCHARGE", ""));
+  }, [rawData]);
+
+  const chartData = useMemo(() => {
+    return rawData.map((item) => {
+      const obj = { time: item.time };
+      selectedNodes.forEach((node) => {
+        const key = `${node}_${selectedMetric}`;
+        obj[node] = item[key];
+      });
+      return obj;
+    });
+  }, [rawData, selectedNodes, selectedMetric]);
+
+  const currentTimeValues = useMemo(() => {
+    if (!selectedTime) return null;
+    const entry = rawData.find(
+      (d) => Math.abs(d.time - selectedTime) < 0.0001
+    );
+    if (!entry) return null;
+
+    const result = {};
+    selectedNodes.forEach((node) => {
+      const key = `${node}_${selectedMetric}`;
+      result[node] = entry[key];
+    });
+    return result;
+  }, [selectedTime, rawData, selectedNodes, selectedMetric]);
+
+  const exportToCSV = () => {
+    if (!rawData.length) return;
+
+    const nodesToExport =
+      exportMode === "all"
+        ? availableNodes
+        : exportMode === "single"
+        ? [singleExportNode]
+        : selectedNodes;
+
+    const headers = ["Time_SEC", ...nodesToExport];
+    const rows = [headers.join(",")];
+
+    chartData.forEach((row) => {
+      rows.push(
+        [row.time, ...nodesToExport.map((n) => row[n] ?? "")].join(",")
+      );
+    });
+
+    const blob = new Blob([rows.join("\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
+
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `water_hammer.csv`;
+    link.click();
+  };
+
+  const selectAllNodes = () => setSelectedNodes(availableNodes);
+  const deselectAllNodes = () => setSelectedNodes([]);
+
+  /* ================= UI ================= */
+  return (
+    <div style={styles.page}>
+      <h1 style={styles.title}>💧 Water Hammer Dashboard</h1>
+
+      <div style={styles.card}>
+        <button style={styles.primaryBtn} onClick={() => fileInputRef.current.click()}>
+          <Upload size={16} /> Upload TAB
+        </button>
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept=".tab,.txt"
+          style={{ display: "none" }}
+          onChange={handleFileUpload}
+        />
+        <p style={styles.status}>{statusMessage}</p>
+      </div>
+
+      {rawData.length > 0 && (
+        <>
+          <div style={styles.card}>
+            <h3>Controls</h3>
+
+            <div style={styles.row}>
+              <label>Metric:</label>
+              <select
+                style={styles.select}
+                value={selectedMetric}
+                onChange={(e) => setSelectedMetric(e.target.value)}
+              >
+                <option value="DISCHARGE">Discharge (CFS)</option>
+                <option value="ENERGY_ELEV">Energy Elevation (ft)</option>
+              </select>
+            </div>
+
+            <div style={styles.row}>
+              <button style={styles.smallBtn} onClick={selectAllNodes}>Select All</button>
+              <button style={styles.smallBtn} onClick={deselectAllNodes}>Deselect All</button>
+            </div>
+
+            <div style={styles.nodeGrid}>
+              {availableNodes.map((node) => (
+                <label key={node} style={styles.checkbox}>
+                  <input
+                    type="checkbox"
+                    checked={selectedNodes.includes(node)}
+                    onChange={() =>
+                      setSelectedNodes((prev) =>
+                        prev.includes(node)
+                          ? prev.filter((n) => n !== node)
+                          : [...prev, node]
+                      )
+                    }
+                  />
+                  {node}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div style={styles.chartCard}>
+            <ResponsiveContainer width="100%" height={400}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="time" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                {selectedNodes.map((node, i) => (
+                  <Line
+                    key={node}
+                    type="monotone"
+                    dataKey={node}
+                    stroke={`hsl(${i * 60}, 70%, 50%)`}
+                    dot={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div style={styles.card}>
+            <h3>Time Analysis</h3>
+            <select
+              style={styles.select}
+              value={selectedTime ?? ""}
+              onChange={(e) => setSelectedTime(parseFloat(e.target.value))}
+            >
+              <option value="">-- Select Time --</option>
+              {rawData.map((d) => (
+                <option key={d.time} value={d.time}>
+                  {d.time}
+                </option>
+              ))}
+            </select>
+
+            {currentTimeValues && (
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Node</th>
+                    <th>{selectedMetric}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(currentTimeValues).map(([node, value]) => (
+                    <tr key={node}>
+                      <td>{node}</td>
+                      <td>{value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div style={styles.card}>
+            <h3>Export</h3>
+            <select
+              style={styles.select}
+              value={exportMode}
+              onChange={(e) => setExportMode(e.target.value)}
+            >
+              <option value="selected">Selected Nodes</option>
+              <option value="all">All Nodes</option>
+              <option value="single">Single Node</option>
+            </select>
+
+            {exportMode === "single" && (
+              <select
+                style={styles.select}
+                value={singleExportNode}
+                onChange={(e) => setSingleExportNode(e.target.value)}
+              >
+                <option value="">Select Node</option>
+                {availableNodes.map((node) => (
+                  <option key={node} value={node}>
+                    {node}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <button style={styles.primaryBtn} onClick={exportToCSV}>
+              <Download size={16} /> Export CSV
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+/* ================= STYLES ================= */
+const styles = {
+  page: {
+    padding: 30,
+    fontFamily: "Segoe UI",
+    background: "#f4f6f9",
+  },
+  title: {
+    marginBottom: 20,
+  },
+  card: {
+    background: "white",
+    padding: 20,
+    marginBottom: 20,
+    borderRadius: 10,
+    boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+  },
+  chartCard: {
+    background: "white",
+    padding: 20,
+    marginBottom: 20,
+    borderRadius: 10,
+    boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+  },
+  row: {
+    display: "flex",
+    gap: 10,
+    marginBottom: 15,
+    alignItems: "center",
+  },
+  nodeGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+    gap: 10,
+  },
+  checkbox: {
+    fontSize: 14,
+  },
+  primaryBtn: {
+    padding: "10px 16px",
+    background: "#2563eb",
+    color: "white",
+    border: "none",
+    borderRadius: 6,
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+  },
+  smallBtn: {
+    padding: "6px 10px",
+    borderRadius: 6,
+    border: "1px solid #ccc",
+    cursor: "pointer",
+  },
+  select: {
+    padding: 8,
+    borderRadius: 6,
+    border: "1px solid #ccc",
+  },
+  table: {
+    width: "100%",
+    marginTop: 15,
+    borderCollapse: "collapse",
+  },
+  status: {
+    marginTop: 10,
+    color: "#555",
+  },
+};
+
+export default WaterHammerDashboard;
