@@ -6,7 +6,7 @@ import {
 import {
   Download, Upload, CheckCircle, AlertCircle, Activity,
   Filter, Sliders, FileText, Play, Pause, Square,
-  SkipBack, Table2, ChevronDown, ChevronUp
+  SkipBack, Table2, ChevronDown, ChevronUp, Maximize2, Minimize2
 } from 'lucide-react';
 
 /* ────────────────────────── palette ──────────────────────────── */
@@ -135,9 +135,26 @@ const WaterHammerDashboard = () => {
   const simSpeedRef    = useRef(simSpeed);
   useEffect(() => { simSpeedRef.current = simSpeed; }, [simSpeed]);
 
+  const [isFullscreen,   setIsFullscreen]   = useState(false);
+  const graphCardRef       = useRef(null);
   const fileInputRef       = useRef(null);
   const scrollContainerRef = useRef(null);
   const scrollLeftRef      = useRef(0);
+
+  /* fullscreen change listener */
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      graphCardRef.current?.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  };
 
   /* ════════════════ TAB PARSER (from provided script) ══════════ */
   const parseTabFile = (content) => {
@@ -612,7 +629,21 @@ const WaterHammerDashboard = () => {
 
             {/* ═══ ROW 3 — Graph Card ══════════════════════════ */}
             {selectedNodes.length > 0 && chartData.length > 0 && (
-              <Card>
+              <div
+                ref={graphCardRef}
+                style={{
+                  background: '#fff', borderRadius: '12px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.06)',
+                  border: '1px solid #E5E7EB', padding: '20px 24px',
+                  /* fullscreen fills the screen */
+                  ...(isFullscreen ? {
+                    borderRadius: 0, border: 'none',
+                    display: 'flex', flexDirection: 'column',
+                    height: '100vh', overflowY: 'auto',
+                    background: '#fff'
+                  } : {})
+                }}
+              >
                 {/* graph header */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -642,6 +673,25 @@ const WaterHammerDashboard = () => {
                         {value} <span style={{ color: '#9CA3AF', fontWeight: 400 }}>{label}</span>
                       </span>
                     ))}
+
+                    {/* ── Fullscreen toggle ── */}
+                    <button
+                      title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+                      onClick={toggleFullscreen}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        width: '32px', height: '32px', borderRadius: '7px',
+                        border: '1.5px solid #E5E7EB', background: '#fff',
+                        cursor: 'pointer', color: '#6366F1', transition: 'all .15s',
+                        flexShrink: 0
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#EEF2FF'; e.currentTarget.style.borderColor = '#6366F1'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#E5E7EB'; }}
+                    >
+                      {isFullscreen
+                        ? <Minimize2 size={15} strokeWidth={2.2} />
+                        : <Maximize2 size={15} strokeWidth={2.2} />}
+                    </button>
                   </div>
                 </div>
 
@@ -944,7 +994,7 @@ const WaterHammerDashboard = () => {
                     {chartData.length.toLocaleString()} rows · {metricLabel}
                   </span>
                 </div>
-              </Card>
+              </div>
             )}
 
             {/* ═══ ROW 4 — Time Analysis Panel (collapsible) ════ */}
