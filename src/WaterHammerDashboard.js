@@ -539,95 +539,6 @@ const WaterHammerDashboard = () => {
               </div>
             </Card>
 
-            {/* ═══ ROW 2 — Filters ═════════════════════════════ */}
-            <Card>
-              <SectionLabel icon={Filter}>Filters</SectionLabel>
-
-              {/* Time sliders */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '20px' }}>
-                <div>
-                  <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Start Time</span>
-                    <span style={{ color: '#6366F1' }}>{timeRange[0].toFixed(2)} s</span>
-                  </label>
-                  <input
-                    type="range" min="0" max={timeRange[1]} step="0.1"
-                    value={timeRange[0]}
-                    onChange={(e) => {
-                      const v = parseFloat(e.target.value);
-                      if (v <= timeRange[1]) { setTimeRange([v, timeRange[1]]); resetSimulation(); }
-                    }}
-                    style={{ width: '100%', cursor: 'pointer', accentColor: '#6366F1' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between' }}>
-                    <span>End Time</span>
-                    <span style={{ color: '#6366F1' }}>{timeRange[1].toFixed(2)} s</span>
-                  </label>
-                  <input
-                    type="range" min={timeRange[0]} max={maxTime} step="0.1"
-                    value={timeRange[1]}
-                    onChange={(e) => {
-                      const v = parseFloat(e.target.value);
-                      if (v >= timeRange[0]) { setTimeRange([timeRange[0], v]); resetSimulation(); }
-                    }}
-                    style={{ width: '100%', cursor: 'pointer', accentColor: '#6366F1' }}
-                  />
-                </div>
-              </div>
-
-              {/* Node header with select/deselect all */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '.04em' }}>
-                  Nodes &nbsp;<span style={{ color: '#9CA3AF', fontWeight: 400, textTransform: 'none' }}>
-                    ({selectedNodes.length}/{availableNodes.length})
-                  </span>
-                </span>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button onClick={() => setSelectedNodes([...availableNodes])} style={btnTiny}>Select All</button>
-                  <button onClick={() => setSelectedNodes([])} style={btnTiny}>Deselect All</button>
-                </div>
-              </div>
-
-              {/* Node chips */}
-              <div style={{
-                display: 'flex', flexWrap: 'wrap', gap: '7px',
-                maxHeight: '150px', overflowY: 'auto',
-                padding: '10px', background: '#F9FAFB',
-                borderRadius: '8px', border: '1px solid #E5E7EB'
-              }}>
-                {availableNodes.map((node) => {
-                  const color  = nodeColor(node);
-                  const active = selectedNodes.includes(node);
-                  return (
-                    <button
-                      key={node}
-                      onClick={() => setSelectedNodes(active
-                        ? selectedNodes.filter(n => n !== node)
-                        : [...selectedNodes, node]
-                      )}
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: '5px',
-                        padding: '4px 11px', borderRadius: '999px',
-                        border: `1.5px solid ${active ? color : '#D1D5DB'}`,
-                        background: active ? `${color}18` : '#fff',
-                        color: active ? color : '#6B7280',
-                        fontWeight: active ? 700 : 500,
-                        fontSize: '0.78rem', cursor: 'pointer', transition: 'all .12s'
-                      }}
-                    >
-                      <span style={{
-                        width: '7px', height: '7px', borderRadius: '50%',
-                        background: active ? color : '#D1D5DB', flexShrink: 0
-                      }} />
-                      {node}
-                    </button>
-                  );
-                })}
-              </div>
-            </Card>
-
             {/* ═══ ROW 3 — Graph Card ══════════════════════════ */}
             {selectedNodes.length > 0 && chartData.length > 0 && (
               <div
@@ -968,6 +879,95 @@ const WaterHammerDashboard = () => {
                 </div>
               </div>
             )}
+
+            {/* ═══ ROW 2 — Filters ═════════════════════════════ */}
+            <Card>
+              <SectionLabel icon={Filter}>Filters</SectionLabel>
+
+              {/* Time sliders */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '20px' }}>
+                <div>
+                  <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Start Time</span>
+                    <span style={{ color: '#6366F1' }}>{timeRange[0].toFixed(2)} s</span>
+                  </label>
+                  <input
+                    type="range" min="0" max={timeRange[1]} step="0.1"
+                    value={timeRange[0]}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value);
+                      if (v <= timeRange[1]) { setTimeRange([v, timeRange[1]]); resetSimulation(); }
+                    }}
+                    style={{ width: '100%', cursor: 'pointer', accentColor: '#6366F1' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ ...labelStyle, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>End Time</span>
+                    <span style={{ color: '#6366F1' }}>{timeRange[1].toFixed(2)} s</span>
+                  </label>
+                  <input
+                    type="range" min={timeRange[0]} max={maxTime} step="0.1"
+                    value={timeRange[1]}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value);
+                      if (v >= timeRange[0]) { setTimeRange([timeRange[0], v]); resetSimulation(); }
+                    }}
+                    style={{ width: '100%', cursor: 'pointer', accentColor: '#6366F1' }}
+                  />
+                </div>
+              </div>
+
+              {/* Node header with select/deselect all */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                  Nodes &nbsp;<span style={{ color: '#9CA3AF', fontWeight: 400, textTransform: 'none' }}>
+                    ({selectedNodes.length}/{availableNodes.length})
+                  </span>
+                </span>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button onClick={() => setSelectedNodes([...availableNodes])} style={btnTiny}>Select All</button>
+                  <button onClick={() => setSelectedNodes([])} style={btnTiny}>Deselect All</button>
+                </div>
+              </div>
+
+              {/* Node chips */}
+              <div style={{
+                display: 'flex', flexWrap: 'wrap', gap: '7px',
+                maxHeight: '150px', overflowY: 'auto',
+                padding: '10px', background: '#F9FAFB',
+                borderRadius: '8px', border: '1px solid #E5E7EB'
+              }}>
+                {availableNodes.map((node) => {
+                  const color  = nodeColor(node);
+                  const active = selectedNodes.includes(node);
+                  return (
+                    <button
+                      key={node}
+                      onClick={() => setSelectedNodes(active
+                        ? selectedNodes.filter(n => n !== node)
+                        : [...selectedNodes, node]
+                      )}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '5px',
+                        padding: '4px 11px', borderRadius: '999px',
+                        border: `1.5px solid ${active ? color : '#D1D5DB'}`,
+                        background: active ? `${color}18` : '#fff',
+                        color: active ? color : '#6B7280',
+                        fontWeight: active ? 700 : 500,
+                        fontSize: '0.78rem', cursor: 'pointer', transition: 'all .12s'
+                      }}
+                    >
+                      <span style={{
+                        width: '7px', height: '7px', borderRadius: '50%',
+                        background: active ? color : '#D1D5DB', flexShrink: 0
+                      }} />
+                      {node}
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
 
             {/* ═══ ROW 4 — Time Analysis Panel (collapsible) ════ */}
             {showAnalysis && rawData.length > 0 && (
