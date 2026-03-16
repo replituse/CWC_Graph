@@ -374,7 +374,8 @@ const WaterHammerDashboard = () => {
   const nodeColor   = (node) => COLORS[availableNodes.indexOf(node) % COLORS.length];
 
   /* chart scrollable width: ~22 px per data point, min 700 */
-  const chartPxWidth = Math.max(700, chartData.length * 22);
+  const chartPxWidth  = Math.max(700, chartData.length * 22);
+  const chartHeight   = isFullscreen ? 560 : 380;
 
   /* simulation time label */
   const simTime = chartData[simIndex]?.time ?? null;
@@ -635,12 +636,12 @@ const WaterHammerDashboard = () => {
                   background: '#fff', borderRadius: '12px',
                   boxShadow: '0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.06)',
                   border: '1px solid #E5E7EB', padding: '20px 24px',
-                  /* fullscreen fills the screen */
+                  /* fullscreen: browser sizes the element — we just layout inside */
                   ...(isFullscreen ? {
                     borderRadius: 0, border: 'none',
                     display: 'flex', flexDirection: 'column',
-                    height: '100vh', overflowY: 'auto',
-                    background: '#fff'
+                    height: '100%', boxSizing: 'border-box',
+                    overflowY: 'auto', background: '#fff'
                   } : {})
                 }}
               >
@@ -774,106 +775,77 @@ const WaterHammerDashboard = () => {
                   </div>
                 </div>
 
+                {/* ── Simulation values panel (above chart, never overlaps) ── */}
+                {simValues && simTime != null && (() => {
+                  const nodes = selectedNodes;
+                  const half  = Math.ceil(nodes.length / 2);
+                  const col1  = nodes.slice(0, half);
+                  const col2  = nodes.slice(half);
+                  return (
+                    <div style={{
+                      background: '#1E293B', borderRadius: '10px',
+                      padding: '10px 16px 12px',
+                      marginBottom: '12px',
+                      boxShadow: '0 4px 18px rgba(0,0,0,.35)',
+                    }}>
+                      {/* time header */}
+                      <div style={{
+                        color: '#CBD5E1', fontSize: '0.78rem', fontWeight: 700,
+                        marginBottom: '8px', borderBottom: '1px solid #334155',
+                        paddingBottom: '6px', textAlign: 'center', letterSpacing: '.06em'
+                      }}>
+                        Time: {simTime.toFixed(2)} s
+                      </div>
+                      {/* 2-column grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 24px' }}>
+                        {[col1, col2].map((col, ci) => (
+                          <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                            {col.map(node => (
+                              <div key={node} style={{
+                                display: 'flex', alignItems: 'center',
+                                justifyContent: 'space-between', gap: '6px', padding: '1px 0'
+                              }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                                  <span style={{
+                                    width: '8px', height: '8px', borderRadius: '50%',
+                                    background: nodeColor(node), flexShrink: 0,
+                                    boxShadow: `0 0 5px ${nodeColor(node)}`
+                                  }} />
+                                  <span style={{ color: '#94A3B8', fontSize: '0.73rem', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                                    {node}
+                                  </span>
+                                </span>
+                                <span style={{
+                                  color: '#F1F5F9', fontSize: '0.76rem', fontWeight: 700,
+                                  fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', flexShrink: 0
+                                }}>
+                                  {simValues[node] != null ? `${simValues[node].toFixed(2)} ${metricUnit}` : '—'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* ── Scrollable chart container ─────────────── */}
                 <div
                   ref={scrollContainerRef}
                   onScroll={(e) => { scrollLeftRef.current = e.target.scrollLeft; }}
                   style={{
                     overflowX: 'auto', overflowY: 'hidden',
-                    borderRadius: '8px', position: 'relative',
+                    borderRadius: '8px',
                     scrollbarWidth: 'thin',
                     scrollbarColor: '#C7D2FE #F3F4F6',
                   }}
                 >
-                  {/* ── Vertical 2-column simulation panel ────── */}
-                  {simValues && simTime != null && (() => {
-                    const MARGIN_LEFT  = 10 + 72;
-                    const MARGIN_RIGHT = 24;
-                    const plotW = chartPxWidth - MARGIN_LEFT - MARGIN_RIGHT;
-                    const minT  = chartData[0]?.time ?? 0;
-                    const maxT  = chartData[chartData.length - 1]?.time ?? 1;
-                    const xAbs  = MARGIN_LEFT + ((simTime - minT) / (maxT - minT)) * plotW;
-
-                    const PANEL_W = 400;
-                    /* flip panel to left side of line when near right edge of content */
-                    const left = xAbs + PANEL_W + 12 > chartPxWidth
-                      ? xAbs - PANEL_W - 12
-                      : xAbs + 12;
-
-                    const nodes = selectedNodes;
-                    const half  = Math.ceil(nodes.length / 2);
-                    const col1  = nodes.slice(0, half);
-                    const col2  = nodes.slice(half);
-
-                    return (
-                      <div style={{
-                        position: 'absolute',
-                        top: '8px',
-                        left: `${Math.max(4, left)}px`,
-                        width: `${PANEL_W}px`,
-                        background: '#1E293B',
-                        borderRadius: '10px',
-                        padding: '10px 14px 12px',
-                        boxShadow: '0 8px 28px rgba(0,0,0,.45)',
-                        zIndex: 20,
-                        pointerEvents: 'none',
-                        maxHeight: '360px',
-                        overflow: 'hidden',
-                      }}>
-                        {/* time header */}
-                        <div style={{
-                          color: '#CBD5E1', fontSize: '0.78rem', fontWeight: 700,
-                          marginBottom: '8px', borderBottom: '1px solid #334155',
-                          paddingBottom: '6px', textAlign: 'center', letterSpacing: '.06em'
-                        }}>
-                          Time: {simTime.toFixed(2)} s
-                        </div>
-                        {/* 2-column grid — each column is a node list */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 16px' }}>
-                          {[col1, col2].map((col, ci) => (
-                            <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                              {col.map(node => (
-                                <div key={node} style={{
-                                  display: 'flex', alignItems: 'center',
-                                  justifyContent: 'space-between', gap: '6px',
-                                  padding: '1px 0'
-                                }}>
-                                  {/* dot + name */}
-                                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
-                                    <span style={{
-                                      width: '8px', height: '8px', borderRadius: '50%',
-                                      background: nodeColor(node), flexShrink: 0
-                                    }} />
-                                    <span style={{
-                                      color: '#94A3B8', fontSize: '0.73rem',
-                                      fontWeight: 500, whiteSpace: 'nowrap'
-                                    }}>
-                                      {node}
-                                    </span>
-                                  </span>
-                                  {/* value */}
-                                  <span style={{
-                                    color: '#F1F5F9', fontSize: '0.76rem',
-                                    fontWeight: 700, fontVariantNumeric: 'tabular-nums',
-                                    whiteSpace: 'nowrap', flexShrink: 0
-                                  }}>
-                                    {simValues[node] != null
-                                      ? `${simValues[node].toFixed(2)} ${metricUnit}`
-                                      : '—'}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })()}
 
                   <div style={{ width: `${chartPxWidth}px`, paddingBottom: '4px' }}>
                     <LineChart
                       width={chartPxWidth}
-                      height={380}
+                      height={chartHeight}
                       data={chartData}
                       margin={{ top: 8, right: 24, left: 10, bottom: 30 }}
                     >
