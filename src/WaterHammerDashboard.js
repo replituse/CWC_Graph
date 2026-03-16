@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ReferenceLine
+  Tooltip, Legend, ReferenceLine, ReferenceDot
 } from 'recharts';
 import {
   Download, Upload, CheckCircle, AlertCircle, Activity,
@@ -138,6 +138,7 @@ const WaterHammerDashboard = () => {
   useEffect(() => { simSpeedRef.current = simSpeed; }, [simSpeed]);
 
   const [isFullscreen,   setIsFullscreen]   = useState(false);
+  const [scrollLeft,     setScrollLeft]     = useState(0);
   const graphCardRef       = useRef(null);
   const fileInputRef       = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -354,7 +355,10 @@ const WaterHammerDashboard = () => {
     const containerW = container.clientWidth;
     const margin = 120;
     if (xAbs < container.scrollLeft + margin || xAbs > container.scrollLeft + containerW - margin) {
-      container.scrollLeft = xAbs - containerW / 2;
+      const newLeft = xAbs - containerW / 2;
+      container.scrollLeft = newLeft;
+      scrollLeftRef.current = container.scrollLeft;
+      setScrollLeft(container.scrollLeft);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simIndex]);
@@ -719,34 +723,25 @@ const WaterHammerDashboard = () => {
                   </div>
                 </div>
 
-                {/* ── Scrollable chart container ─────────────── */}
-                <div
-                  ref={scrollContainerRef}
-                  onScroll={(e) => { scrollLeftRef.current = e.target.scrollLeft; }}
-                  style={{
-                    overflowX: 'auto', overflowY: 'hidden',
-                    borderRadius: '8px', position: 'relative',
-                    scrollbarWidth: 'thin',
-                    scrollbarColor: '#C7D2FE #F3F4F6',
-                  }}
-                >
-                  {/* ── Floating simulation panel (scroll-aware, never hides ref line) ── */}
+                {/* ── Chart wrapper: floating panel + scrollable chart ── */}
+                <div style={{ position: 'relative' }}>
+
+                  {/* ── Floating simulation panel — outside scroll container, always visible ── */}
                   {simValues && simTime != null && (() => {
                     const MARGIN_LEFT  = 10 + 72;
                     const MARGIN_RIGHT = 24;
-                    const plotW  = chartPxWidth - MARGIN_LEFT - MARGIN_RIGHT;
-                    const minT   = chartData[0]?.time ?? 0;
-                    const maxT   = chartData[chartData.length - 1]?.time ?? 1;
-                    const xContent = MARGIN_LEFT + ((simTime - minT) / (maxT - minT)) * plotW;
-                    const xVisual  = xContent - (scrollLeftRef.current ?? 0);
+                    const plotW      = chartPxWidth - MARGIN_LEFT - MARGIN_RIGHT;
+                    const minT       = chartData[0]?.time ?? 0;
+                    const maxT       = chartData[chartData.length - 1]?.time ?? 1;
+                    const xContent   = MARGIN_LEFT + ((simTime - minT) / (maxT - minT)) * plotW;
+                    const xVisual    = xContent - scrollLeft;
                     const containerW = scrollContainerRef.current?.clientWidth ?? 700;
 
-                    const PANEL_W = 430;
+                    const PANEL_W   = 430;
                     const PANEL_GAP = 16;
-                    /* place panel to the right unless it would overflow, then left */
                     const left = xVisual + PANEL_GAP + PANEL_W < containerW
                       ? xVisual + PANEL_GAP
-                      : xVisual - PANEL_W - PANEL_GAP;
+                      : Math.max(4, xVisual - PANEL_W - PANEL_GAP);
 
                     const nodes = selectedNodes;
                     const half  = Math.ceil(nodes.length / 2);
@@ -757,13 +752,13 @@ const WaterHammerDashboard = () => {
                       <div style={{
                         position: 'absolute',
                         top: '10px',
-                        left: `${Math.max(4, left)}px`,
+                        left: `${left}px`,
                         width: `${PANEL_W}px`,
                         background: '#1E293B',
                         borderRadius: '10px',
                         padding: '10px 14px 12px',
                         boxShadow: '0 8px 28px rgba(0,0,0,.5)',
-                        zIndex: 20,
+                        zIndex: 50,
                         pointerEvents: 'none',
                       }}>
                         <div style={{
@@ -814,128 +809,114 @@ const WaterHammerDashboard = () => {
                     );
                   })()}
 
-                  {/* ── HTML reference line + dots — always on top of the panel ── */}
-                  {simTime != null && simValues && (() => {
-                    const ML = 10 + 72, MR = 24, MT = 8, MB = 30;
-                    const plotW = chartPxWidth - ML - MR;
-                    const minT  = chartData[0]?.time ?? 0;
-                    const maxT  = chartData[chartData.length - 1]?.time ?? 1;
-                    const xAbs  = ML + ((simTime - minT) / (maxT - minT)) * plotW;
-                    const plotH = chartHeight - MT - MB;
-                    const [yLo, yHi] = yDomain;
-                    const toY = v => MT + (1 - (v - yLo) / (yHi - yLo)) * plotH;
-                    return (
-                      <>
-                        {/* solid vertical reference line above panel */}
-                        <div style={{
-                          position: 'absolute',
-                          left: `${xAbs}px`, top: `${MT}px`,
-                          height: `${plotH}px`, width: '2px',
-                          background: '#6366F1',
-                          transform: 'translateX(-50%)',
-                          zIndex: 30, pointerEvents: 'none',
-                        }} />
-                        {/* colored intersection dots above panel */}
-                        {selectedNodes.map(node => {
+                  {/* ── Scrollable chart container ── */}
+                  <div
+                    ref={scrollContainerRef}
+                    onScroll={(e) => {
+                      scrollLeftRef.current = e.target.scrollLeft;
+                      setScrollLeft(e.target.scrollLeft);
+                    }}
+                    style={{
+                      overflowX: 'auto', overflowY: 'hidden',
+                      borderRadius: '8px',
+                      scrollbarWidth: 'thin',
+                      scrollbarColor: '#C7D2FE #F3F4F6',
+                    }}
+                  >
+                    <div style={{ width: `${chartPxWidth}px`, paddingBottom: '4px' }}>
+                      <LineChart
+                        width={chartPxWidth}
+                        height={chartHeight}
+                        data={chartData}
+                        margin={{ top: 8, right: 24, left: 10, bottom: 30 }}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="0"
+                          stroke="#374151"
+                          strokeWidth={0.6}
+                          horizontal={true}
+                          vertical={true}
+                          opacity={0.35}
+                        />
+                        <XAxis
+                          dataKey="time"
+                          stroke="#D1D5DB"
+                          tick={{ fontSize: 10, fill: '#9CA3AF', fontVariantNumeric: 'tabular-nums' }}
+                          tickLine={{ stroke: '#E5E7EB' }}
+                          axisLine={{ stroke: '#E5E7EB' }}
+                          interval={0}
+                          label={{
+                            value: 'Time (seconds)', position: 'insideBottomRight',
+                            offset: -6, fill: '#9CA3AF', fontSize: 11
+                          }}
+                        />
+                        <YAxis
+                          stroke="#D1D5DB"
+                          tick={{ fontSize: 10, fill: '#9CA3AF' }}
+                          tickLine={false}
+                          axisLine={false}
+                          width={72}
+                          domain={yDomain}
+                          label={{
+                            value: metricLabel, angle: -90,
+                            position: 'insideLeft', offset: 12,
+                            fill: '#9CA3AF', fontSize: 11
+                          }}
+                        />
+                        <Tooltip
+                          content={<CustomTooltip metric={selectedMetric} />}
+                          cursor={{ stroke: '#6366F1', strokeWidth: 1, strokeDasharray: '5 4', opacity: 0.7 }}
+                          position={{ y: 0 }}
+                          offset={18}
+                          allowEscapeViewBox={{ x: false, y: true }}
+                          wrapperStyle={{ zIndex: 30, top: 0 }}
+                        />
+                        <Legend
+                          wrapperStyle={{
+                            paddingTop: '14px', fontSize: '0.78rem', fontWeight: 600,
+                            maxHeight: '72px', overflowY: 'auto'
+                          }}
+                          iconType="circle" iconSize={8}
+                        />
+                        {/* solid vertical reference line during simulation */}
+                        {simTime != null && (
+                          <ReferenceLine
+                            x={simTime}
+                            stroke="#6366F1"
+                            strokeWidth={2}
+                            strokeDasharray={isSimulating ? '0' : '6 3'}
+                          />
+                        )}
+                        {/* perfectly-aligned node dots rendered by Recharts itself */}
+                        {simTime != null && simValues && selectedNodes.map(node => {
                           const val = simValues[node];
                           if (val == null) return null;
-                          const y = toY(val);
-                          if (y < MT - 8 || y > MT + plotH + 8) return null;
                           return (
-                            <div key={`hdot-${node}`} style={{
-                              position: 'absolute',
-                              left: `${xAbs}px`, top: `${y}px`,
-                              width: '13px', height: '13px',
-                              borderRadius: '50%',
-                              background: nodeColor(node),
-                              border: '2.5px solid #fff',
-                              transform: 'translate(-50%, -50%)',
-                              zIndex: 31, pointerEvents: 'none',
-                              boxShadow: `0 0 6px ${nodeColor(node)}`,
-                            }} />
+                            <ReferenceDot
+                              key={`rdot-${node}`}
+                              x={simTime}
+                              y={val}
+                              r={6}
+                              fill={nodeColor(node)}
+                              stroke="#fff"
+                              strokeWidth={2}
+                            />
                           );
                         })}
-                      </>
-                    );
-                  })()}
-
-                  <div style={{ width: `${chartPxWidth}px`, paddingBottom: '4px' }}>
-                    <LineChart
-                      width={chartPxWidth}
-                      height={chartHeight}
-                      data={chartData}
-                      margin={{ top: 8, right: 24, left: 10, bottom: 30 }}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="0"
-                        stroke="#374151"
-                        strokeWidth={0.6}
-                        horizontal={true}
-                        vertical={true}
-                        opacity={0.35}
-                      />
-                      <XAxis
-                        dataKey="time"
-                        stroke="#D1D5DB"
-                        tick={{ fontSize: 10, fill: '#9CA3AF', fontVariantNumeric: 'tabular-nums' }}
-                        tickLine={{ stroke: '#E5E7EB' }}
-                        axisLine={{ stroke: '#E5E7EB' }}
-                        interval={0}
-                        label={{
-                          value: 'Time (seconds)', position: 'insideBottomRight',
-                          offset: -6, fill: '#9CA3AF', fontSize: 11
-                        }}
-                      />
-                      <YAxis
-                        stroke="#D1D5DB"
-                        tick={{ fontSize: 10, fill: '#9CA3AF' }}
-                        tickLine={false}
-                        axisLine={false}
-                        width={72}
-                        domain={yDomain}
-                        label={{
-                          value: metricLabel, angle: -90,
-                          position: 'insideLeft', offset: 12,
-                          fill: '#9CA3AF', fontSize: 11
-                        }}
-                      />
-                      <Tooltip
-                        content={<CustomTooltip metric={selectedMetric} />}
-                        cursor={{ stroke: '#6366F1', strokeWidth: 1, strokeDasharray: '5 4', opacity: 0.7 }}
-                        position={{ y: 0 }}
-                        offset={18}
-                        allowEscapeViewBox={{ x: false, y: true }}
-                        wrapperStyle={{ zIndex: 30, top: 0 }}
-                      />
-                      <Legend
-                        wrapperStyle={{
-                          paddingTop: '14px', fontSize: '0.78rem', fontWeight: 600,
-                          maxHeight: '72px', overflowY: 'auto'
-                        }}
-                        iconType="circle" iconSize={8}
-                      />
-                      {/* simulation reference line (SVG, visible where not covered by panel) */}
-                      {simTime != null && (
-                        <ReferenceLine
-                          x={simTime}
-                          stroke="#6366F1"
-                          strokeWidth={2}
-                          strokeDasharray="6 3"
-                        />
-                      )}
-                      {selectedNodes.map((node) => (
-                        <Line
-                          key={node}
-                          type="monotone"
-                          dataKey={node}
-                          stroke={nodeColor(node)}
-                          strokeWidth={2}
-                          dot={chartData.length <= 400 ? { r: 2, fill: nodeColor(node), strokeWidth: 0, opacity: 0.7 } : false}
-                          activeDot={{ r: 6, fill: nodeColor(node), stroke: '#fff', strokeWidth: 2 }}
-                          isAnimationActive={false}
-                        />
-                      ))}
-                    </LineChart>
+                        {selectedNodes.map((node) => (
+                          <Line
+                            key={node}
+                            type="monotone"
+                            dataKey={node}
+                            stroke={nodeColor(node)}
+                            strokeWidth={2}
+                            dot={chartData.length <= 400 ? { r: 2, fill: nodeColor(node), strokeWidth: 0, opacity: 0.7 } : false}
+                            activeDot={{ r: 6, fill: nodeColor(node), stroke: '#fff', strokeWidth: 2 }}
+                            isAnimationActive={false}
+                          />
+                        ))}
+                      </LineChart>
+                    </div>
                   </div>
                 </div>
 
