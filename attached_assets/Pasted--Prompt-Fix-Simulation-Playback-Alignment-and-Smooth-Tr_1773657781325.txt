@@ -1,0 +1,49 @@
+**Prompt: Fix Simulation Playback Alignment and Smooth Transition (Without Changing Existing Logic)**
+
+You are a senior React.js and data-visualization engineer. Improve the **run simulation playback visualization** in the Water Hammer Analysis Dashboard without modifying any existing backend logic, data parsing, or calculation logic.
+
+### Requirements
+
+1. **Fix Simulation Playback Visualization**
+
+* When the **Run Simulation button** is clicked, the graph should behave like a **continuous animated timeline**, similar to the first reference image.
+* The **vertical time indicator line** must move **smoothly across the graph**.
+* The animation should be **continuous**, not jump, break, or restart repeatedly.
+
+2. **Align Graph Dots Properly**
+
+* Ensure **node data points (dots)** are **perfectly aligned with the vertical time indicator line**.
+* All node markers should appear **exactly on their corresponding line positions**.
+* Avoid any **offset or misalignment between dots and the vertical line**.
+
+3. **Smooth Animation**
+
+* Implement **smooth frame-based animation** using requestAnimationFrame or optimized interval updates.
+* The timeline should progress **continuously without pause → break → restart behavior**.
+* Graph updates should feel like a **real-time simulation playback**.
+
+4. **Tooltip Synchronization**
+
+* Tooltip values must update **in sync with the moving vertical line**.
+* Tooltip should always display the **correct node values at the current time step**.
+
+5. **Maintain Existing Functionality**
+   Do NOT modify:
+
+* Data loading logic
+* TAB file parsing
+* Node calculations
+* Metric selection
+* CSV export
+* Graph data structure
+
+Only improve:
+
+* animation logic
+* dot alignment
+* vertical timeline movement
+* UI smoothness
+
+### Expected Result
+
+The simulation playback should look like a **professional engineering simulation viewer**, where the **vertical timeline moves smoothly and node points follow the timeline correctly without breaking or jumping.**

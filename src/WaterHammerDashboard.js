@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ReferenceLine, ReferenceDot
+  Tooltip, Legend, ReferenceLine
 } from 'recharts';
 import {
   Download, Upload, CheckCircle, AlertCircle, Activity,
@@ -134,6 +134,7 @@ const WaterHammerDashboard = () => {
   const lastFrameTime  = useRef(0);
   const simSpeedRef    = useRef(simSpeed);
   const simIndexRef    = useRef(0);
+  const totalFramesRef = useRef(0);
   useEffect(() => { simSpeedRef.current = simSpeed; }, [simSpeed]);
 
   const [isFullscreen,   setIsFullscreen]   = useState(false);
@@ -285,13 +286,18 @@ const WaterHammerDashboard = () => {
     setIsSimulating(false);
   }, []);
 
-  const startSimulation = useCallback(() => {
-    if (!chartData.length) return;
+  const startSimulation = useCallback((fromIndex) => {
+    if (!totalFramesRef.current) return;
     if (simRef.current) cancelAnimationFrame(simRef.current);
+
+    /* if a starting index is provided (restart from 0), apply it now */
+    if (fromIndex !== undefined) {
+      simIndexRef.current = fromIndex;
+      setSimIndex(fromIndex);
+    }
+
     lastFrameTime.current = 0;
     setIsSimulating(true);
-
-    const totalFrames = chartData.length;
 
     const animate = (timestamp) => {
       if (!lastFrameTime.current) lastFrameTime.current = timestamp;
@@ -300,7 +306,7 @@ const WaterHammerDashboard = () => {
       if (elapsed >= simSpeedRef.current) {
         lastFrameTime.current = timestamp - (elapsed % simSpeedRef.current);
         const next = simIndexRef.current + 1;
-        if (next >= totalFrames) {
+        if (next >= totalFramesRef.current) {
           /* reached the end — stop cleanly */
           simRef.current = null;
           setIsSimulating(false);
@@ -313,7 +319,7 @@ const WaterHammerDashboard = () => {
     };
 
     simRef.current = requestAnimationFrame(animate);
-  }, [chartData.length]);
+  }, []);
 
   const pauseSimulation = useCallback(() => {
     if (simRef.current) cancelAnimationFrame(simRef.current);
@@ -328,6 +334,9 @@ const WaterHammerDashboard = () => {
 
   /* keep simIndexRef in sync when index is changed externally (reset/seek) */
   useEffect(() => { simIndexRef.current = simIndex; }, [simIndex]);
+
+  /* keep totalFramesRef in sync with chartData */
+  useEffect(() => { totalFramesRef.current = chartData.length; }, [chartData.length]);
 
   /* cleanup on unmount */
   useEffect(() => () => { if (simRef.current) cancelAnimationFrame(simRef.current); }, []);
@@ -647,7 +656,13 @@ const WaterHammerDashboard = () => {
                   ) : (
                     <button
                       title="Run Simulation"
-                      onClick={() => simIndex >= chartData.length - 1 ? (setSimIndex(0), setTimeout(startSimulation, 50)) : startSimulation()}
+                      onClick={() => {
+                        if (simIndex >= chartData.length - 1) {
+                          startSimulation(0);
+                        } else {
+                          startSimulation();
+                        }
+                      }}
                       style={{ ...simBtn, background: '#EEF2FF', color: '#6366F1', borderColor: '#C7D2FE' }}
                     >
                       <Play size={15} strokeWidth={2.4} />
@@ -877,6 +892,7 @@ const WaterHammerDashboard = () => {
                         tickLine={false}
                         axisLine={false}
                         width={72}
+                        domain={yDomain}
                         label={{
                           value: metricLabel, angle: -90,
                           position: 'insideLeft', offset: 12,
