@@ -384,6 +384,17 @@ const WaterHammerDashboard = () => {
   const chartPxWidth  = Math.max(700, chartData.length * 22);
   const chartHeight   = isFullscreen ? 560 : 380;
 
+  /* y-axis domain so we can place HTML overlays at exact pixel positions */
+  const yDomain = useMemo(() => {
+    if (!chartData.length || !selectedNodes.length) return [0, 1];
+    let lo = Infinity, hi = -Infinity;
+    chartData.forEach(d => selectedNodes.forEach(n => {
+      if (d[n] != null) { if (d[n] < lo) lo = d[n]; if (d[n] > hi) hi = d[n]; }
+    }));
+    const pad = (hi - lo) * 0.05 || 1;
+    return [lo - pad, hi + pad];
+  }, [chartData, selectedNodes]);
+
   /* simulation time label */
   const simTime = chartData[simIndex]?.time ?? null;
   const simPct  = chartData.length > 1
@@ -788,6 +799,51 @@ const WaterHammerDashboard = () => {
                     );
                   })()}
 
+                  {/* ── HTML reference line + dots — always on top of the panel ── */}
+                  {simTime != null && simValues && (() => {
+                    const ML = 10 + 72, MR = 24, MT = 8, MB = 30;
+                    const plotW = chartPxWidth - ML - MR;
+                    const minT  = chartData[0]?.time ?? 0;
+                    const maxT  = chartData[chartData.length - 1]?.time ?? 1;
+                    const xAbs  = ML + ((simTime - minT) / (maxT - minT)) * plotW;
+                    const plotH = chartHeight - MT - MB;
+                    const [yLo, yHi] = yDomain;
+                    const toY = v => MT + (1 - (v - yLo) / (yHi - yLo)) * plotH;
+                    return (
+                      <>
+                        {/* solid vertical reference line above panel */}
+                        <div style={{
+                          position: 'absolute',
+                          left: `${xAbs}px`, top: `${MT}px`,
+                          height: `${plotH}px`, width: '2px',
+                          background: '#6366F1',
+                          transform: 'translateX(-50%)',
+                          zIndex: 30, pointerEvents: 'none',
+                        }} />
+                        {/* colored intersection dots above panel */}
+                        {selectedNodes.map(node => {
+                          const val = simValues[node];
+                          if (val == null) return null;
+                          const y = toY(val);
+                          if (y < MT - 8 || y > MT + plotH + 8) return null;
+                          return (
+                            <div key={`hdot-${node}`} style={{
+                              position: 'absolute',
+                              left: `${xAbs}px`, top: `${y}px`,
+                              width: '13px', height: '13px',
+                              borderRadius: '50%',
+                              background: nodeColor(node),
+                              border: '2.5px solid #fff',
+                              transform: 'translate(-50%, -50%)',
+                              zIndex: 31, pointerEvents: 'none',
+                              boxShadow: `0 0 6px ${nodeColor(node)}`,
+                            }} />
+                          );
+                        })}
+                      </>
+                    );
+                  })()}
+
                   <div style={{ width: `${chartPxWidth}px`, paddingBottom: '4px' }}>
                     <LineChart
                       width={chartPxWidth}
@@ -842,29 +898,14 @@ const WaterHammerDashboard = () => {
                         }}
                         iconType="circle" iconSize={8}
                       />
-                      {/* simulation reference line */}
+                      {/* simulation reference line (SVG, visible where not covered by panel) */}
                       {simTime != null && (
                         <ReferenceLine
                           x={simTime}
                           stroke="#6366F1"
                           strokeWidth={2}
-                          strokeDasharray="0"
+                          strokeDasharray="6 3"
                         />
-                      )}
-                      {/* intersection dots on each line at current sim time */}
-                      {simTime != null && simValues && selectedNodes.map((node) =>
-                        simValues[node] != null ? (
-                          <ReferenceDot
-                            key={`dot-${node}`}
-                            x={simTime}
-                            y={simValues[node]}
-                            r={6}
-                            fill={nodeColor(node)}
-                            stroke="#fff"
-                            strokeWidth={2}
-                            isFront={true}
-                          />
-                        ) : null
                       )}
                       {selectedNodes.map((node) => (
                         <Line
