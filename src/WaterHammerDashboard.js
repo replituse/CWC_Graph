@@ -133,6 +133,7 @@ const WaterHammerDashboard = () => {
   const simRef         = useRef(null);
   const lastFrameTime  = useRef(0);
   const simSpeedRef    = useRef(simSpeed);
+  const simIndexRef    = useRef(0);
   useEffect(() => { simSpeedRef.current = simSpeed; }, [simSpeed]);
 
   const [isFullscreen,   setIsFullscreen]   = useState(false);
@@ -286,8 +287,11 @@ const WaterHammerDashboard = () => {
 
   const startSimulation = useCallback(() => {
     if (!chartData.length) return;
+    if (simRef.current) cancelAnimationFrame(simRef.current);
     lastFrameTime.current = 0;
     setIsSimulating(true);
+
+    const totalFrames = chartData.length;
 
     const animate = (timestamp) => {
       if (!lastFrameTime.current) lastFrameTime.current = timestamp;
@@ -295,13 +299,15 @@ const WaterHammerDashboard = () => {
 
       if (elapsed >= simSpeedRef.current) {
         lastFrameTime.current = timestamp - (elapsed % simSpeedRef.current);
-        setSimIndex(prev => {
-          if (prev >= chartData.length - 1) {
-            setIsSimulating(false);
-            return prev;
-          }
-          return prev + 1;
-        });
+        const next = simIndexRef.current + 1;
+        if (next >= totalFrames) {
+          /* reached the end — stop cleanly */
+          simRef.current = null;
+          setIsSimulating(false);
+          return;
+        }
+        simIndexRef.current = next;
+        setSimIndex(next);
       }
       simRef.current = requestAnimationFrame(animate);
     };
@@ -320,7 +326,8 @@ const WaterHammerDashboard = () => {
     setSimIndex(0);
   }, [stopSimulation]);
 
-  /* no restart-on-speed-change needed — RAF reads simSpeedRef live */
+  /* keep simIndexRef in sync when index is changed externally (reset/seek) */
+  useEffect(() => { simIndexRef.current = simIndex; }, [simIndex]);
 
   /* cleanup on unmount */
   useEffect(() => () => { if (simRef.current) cancelAnimationFrame(simRef.current); }, []);
@@ -695,40 +702,50 @@ const WaterHammerDashboard = () => {
                   return (
                     <div style={{
                       background: '#1E293B', borderRadius: '10px',
-                      padding: '10px 16px 12px',
+                      padding: '12px 18px 14px',
                       marginBottom: '12px',
                       boxShadow: '0 4px 18px rgba(0,0,0,.35)',
                     }}>
                       {/* time header */}
                       <div style={{
-                        color: '#CBD5E1', fontSize: '0.78rem', fontWeight: 700,
-                        marginBottom: '8px', borderBottom: '1px solid #334155',
-                        paddingBottom: '6px', textAlign: 'center', letterSpacing: '.06em'
+                        color: '#CBD5E1', fontSize: '0.82rem', fontWeight: 700,
+                        marginBottom: '10px', borderBottom: '1px solid #334155',
+                        paddingBottom: '7px', textAlign: 'center', letterSpacing: '.06em'
                       }}>
                         Time: {simTime.toFixed(2)} s
                       </div>
-                      {/* 2-column grid */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 24px' }}>
+                      {/* 2-column table — each half the available width */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
                         {[col1, col2].map((col, ci) => (
-                          <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <div key={ci}>
                             {col.map(node => (
                               <div key={node} style={{
                                 display: 'flex', alignItems: 'center',
-                                justifyContent: 'space-between', gap: '6px', padding: '1px 0'
+                                justifyContent: 'space-between',
+                                padding: '2px 0', minWidth: 0
                               }}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                                {/* dot + node name */}
+                                <span style={{
+                                  display: 'flex', alignItems: 'center', gap: '5px',
+                                  overflow: 'hidden', minWidth: 0, flexShrink: 1
+                                }}>
                                   <span style={{
-                                    width: '8px', height: '8px', borderRadius: '50%',
-                                    background: nodeColor(node), flexShrink: 0,
+                                    width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                                    background: nodeColor(node),
                                     boxShadow: `0 0 5px ${nodeColor(node)}`
                                   }} />
-                                  <span style={{ color: '#94A3B8', fontSize: '0.73rem', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                                  <span style={{
+                                    color: '#94A3B8', fontSize: '0.73rem', fontWeight: 500,
+                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                                  }}>
                                     {node}
                                   </span>
                                 </span>
+                                {/* value — always visible, shrinks name if needed */}
                                 <span style={{
                                   color: '#F1F5F9', fontSize: '0.76rem', fontWeight: 700,
-                                  fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', flexShrink: 0
+                                  fontVariantNumeric: 'tabular-nums',
+                                  whiteSpace: 'nowrap', flexShrink: 0, paddingLeft: '8px'
                                 }}>
                                   {simValues[node] != null ? `${simValues[node].toFixed(2)} ${metricUnit}` : '—'}
                                 </span>
@@ -807,18 +824,13 @@ const WaterHammerDashboard = () => {
                         }}
                         iconType="circle" iconSize={8}
                       />
-                      {/* simulation reference line */}
+                      {/* simulation reference line — no label (time is shown in the panel above) */}
                       {simTime != null && (
                         <ReferenceLine
                           x={simTime}
                           stroke="#6366F1"
                           strokeWidth={2}
                           strokeDasharray="0"
-                          label={{
-                            value: `${simTime.toFixed(2)}s`,
-                            position: 'top', fill: '#6366F1',
-                            fontSize: 10, fontWeight: 700
-                          }}
                         />
                       )}
                       {selectedNodes.map((node) => (
