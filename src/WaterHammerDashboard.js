@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ReferenceLine
+  Tooltip, Legend, ReferenceLine, ReferenceDot
 } from 'recharts';
 import {
   Download, Upload, CheckCircle, AlertCircle, Activity,
@@ -693,82 +693,100 @@ const WaterHammerDashboard = () => {
                   </div>
                 </div>
 
-                {/* ── Simulation values panel (above chart, never overlaps) ── */}
-                {simValues && simTime != null && (() => {
-                  const nodes = selectedNodes;
-                  const half  = Math.ceil(nodes.length / 2);
-                  const col1  = nodes.slice(0, half);
-                  const col2  = nodes.slice(half);
-                  return (
-                    <div style={{
-                      background: '#1E293B', borderRadius: '10px',
-                      padding: '12px 18px 14px',
-                      marginBottom: '12px',
-                      boxShadow: '0 4px 18px rgba(0,0,0,.35)',
-                    }}>
-                      {/* time header */}
-                      <div style={{
-                        color: '#CBD5E1', fontSize: '0.82rem', fontWeight: 700,
-                        marginBottom: '10px', borderBottom: '1px solid #334155',
-                        paddingBottom: '7px', textAlign: 'center', letterSpacing: '.06em'
-                      }}>
-                        Time: {simTime.toFixed(2)} s
-                      </div>
-                      {/* 2-column table — each half the available width */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
-                        {[col1, col2].map((col, ci) => (
-                          <div key={ci}>
-                            {col.map(node => (
-                              <div key={node} style={{
-                                display: 'flex', alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: '2px 0', minWidth: 0
-                              }}>
-                                {/* dot + node name */}
-                                <span style={{
-                                  display: 'flex', alignItems: 'center', gap: '5px',
-                                  overflow: 'hidden', minWidth: 0, flexShrink: 1
-                                }}>
-                                  <span style={{
-                                    width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                                    background: nodeColor(node),
-                                    boxShadow: `0 0 5px ${nodeColor(node)}`
-                                  }} />
-                                  <span style={{
-                                    color: '#94A3B8', fontSize: '0.73rem', fontWeight: 500,
-                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                                  }}>
-                                    {node}
-                                  </span>
-                                </span>
-                                {/* value — always visible, shrinks name if needed */}
-                                <span style={{
-                                  color: '#F1F5F9', fontSize: '0.76rem', fontWeight: 700,
-                                  fontVariantNumeric: 'tabular-nums',
-                                  whiteSpace: 'nowrap', flexShrink: 0, paddingLeft: '8px'
-                                }}>
-                                  {simValues[node] != null ? `${simValues[node].toFixed(2)} ${metricUnit}` : '—'}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-
                 {/* ── Scrollable chart container ─────────────── */}
                 <div
                   ref={scrollContainerRef}
                   onScroll={(e) => { scrollLeftRef.current = e.target.scrollLeft; }}
                   style={{
                     overflowX: 'auto', overflowY: 'hidden',
-                    borderRadius: '8px',
+                    borderRadius: '8px', position: 'relative',
                     scrollbarWidth: 'thin',
                     scrollbarColor: '#C7D2FE #F3F4F6',
                   }}
                 >
+                  {/* ── Floating simulation panel (scroll-aware, never hides ref line) ── */}
+                  {simValues && simTime != null && (() => {
+                    const MARGIN_LEFT  = 10 + 72;
+                    const MARGIN_RIGHT = 24;
+                    const plotW  = chartPxWidth - MARGIN_LEFT - MARGIN_RIGHT;
+                    const minT   = chartData[0]?.time ?? 0;
+                    const maxT   = chartData[chartData.length - 1]?.time ?? 1;
+                    const xContent = MARGIN_LEFT + ((simTime - minT) / (maxT - minT)) * plotW;
+                    const xVisual  = xContent - (scrollLeftRef.current ?? 0);
+                    const containerW = scrollContainerRef.current?.clientWidth ?? 700;
+
+                    const PANEL_W = 430;
+                    const PANEL_GAP = 16;
+                    /* place panel to the right unless it would overflow, then left */
+                    const left = xVisual + PANEL_GAP + PANEL_W < containerW
+                      ? xVisual + PANEL_GAP
+                      : xVisual - PANEL_W - PANEL_GAP;
+
+                    const nodes = selectedNodes;
+                    const half  = Math.ceil(nodes.length / 2);
+                    const col1  = nodes.slice(0, half);
+                    const col2  = nodes.slice(half);
+
+                    return (
+                      <div style={{
+                        position: 'absolute',
+                        top: '10px',
+                        left: `${Math.max(4, left)}px`,
+                        width: `${PANEL_W}px`,
+                        background: '#1E293B',
+                        borderRadius: '10px',
+                        padding: '10px 14px 12px',
+                        boxShadow: '0 8px 28px rgba(0,0,0,.5)',
+                        zIndex: 20,
+                        pointerEvents: 'none',
+                      }}>
+                        <div style={{
+                          color: '#CBD5E1', fontSize: '0.82rem', fontWeight: 700,
+                          marginBottom: '8px', borderBottom: '1px solid #334155',
+                          paddingBottom: '6px', textAlign: 'center', letterSpacing: '.06em'
+                        }}>
+                          Time: {simTime.toFixed(2)} s
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+                          {[col1, col2].map((col, ci) => (
+                            <div key={ci}>
+                              {col.map(node => (
+                                <div key={node} style={{
+                                  display: 'flex', alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '2px 0', minWidth: 0
+                                }}>
+                                  <span style={{
+                                    display: 'flex', alignItems: 'center', gap: '5px',
+                                    minWidth: 0, flexShrink: 1, overflow: 'hidden'
+                                  }}>
+                                    <span style={{
+                                      width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                                      background: nodeColor(node),
+                                      boxShadow: `0 0 6px ${nodeColor(node)}`
+                                    }} />
+                                    <span style={{
+                                      color: '#94A3B8', fontSize: '0.73rem', fontWeight: 500,
+                                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                                    }}>
+                                      {node}
+                                    </span>
+                                  </span>
+                                  <span style={{
+                                    color: '#F1F5F9', fontSize: '0.76rem', fontWeight: 700,
+                                    fontVariantNumeric: 'tabular-nums',
+                                    whiteSpace: 'nowrap', flexShrink: 0, paddingLeft: '8px'
+                                  }}>
+                                    {simValues[node] != null ? `${simValues[node].toFixed(2)} ${metricUnit}` : '—'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div style={{ width: `${chartPxWidth}px`, paddingBottom: '4px' }}>
                     <LineChart
@@ -824,7 +842,7 @@ const WaterHammerDashboard = () => {
                         }}
                         iconType="circle" iconSize={8}
                       />
-                      {/* simulation reference line — no label (time is shown in the panel above) */}
+                      {/* simulation reference line */}
                       {simTime != null && (
                         <ReferenceLine
                           x={simTime}
@@ -832,6 +850,21 @@ const WaterHammerDashboard = () => {
                           strokeWidth={2}
                           strokeDasharray="0"
                         />
+                      )}
+                      {/* intersection dots on each line at current sim time */}
+                      {simTime != null && simValues && selectedNodes.map((node) =>
+                        simValues[node] != null ? (
+                          <ReferenceDot
+                            key={`dot-${node}`}
+                            x={simTime}
+                            y={simValues[node]}
+                            r={6}
+                            fill={nodeColor(node)}
+                            stroke="#fff"
+                            strokeWidth={2}
+                            isFront={true}
+                          />
+                        ) : null
                       )}
                       {selectedNodes.map((node) => (
                         <Line
